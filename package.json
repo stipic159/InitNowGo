@@ -1,0 +1,26 @@
+{
+  "name": "initnowgo",
+  "version": "1.0.0",
+  "description": "telegram-bot",
+  "main": "src/main.ts",
+  "scripts": {
+    "test": "ts-node src/main.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^24.0.3",
+    "nodemon": "^3.1.10",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@grammyjs/types": "^3.20.0",
+    "chalk": "^5.4.1",
+    "dotenv": "^16.5.0",
+    "grammy": "^1.36.3",
+    "mongoose": "^8.16.0",
+    "typegram": "^5.2.0"
+  }
+}
