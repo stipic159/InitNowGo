@@ -1,6 +1,6 @@
 import { Context } from "grammy";
 import { ModuleParams } from "../updates/BotUpdates";
-import sck1 from "./database/user.db";
+import { sck1 } from "./database";
 // import { eco, EconomyOperations } from "../updates/Eco";
 
 export function isGroup(ctx?: Context): boolean {

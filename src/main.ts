@@ -1,9 +1,8 @@
-import { Bot, Context, session } from "grammy";
+import { Bot, Context, session, SessionFlavor } from "grammy";
 import mongoose from "mongoose";
 import path from "path";
-import { config } from "./config/env.config";
+import { config, Logger } from "./lib";
 import BotUpdate from "./updates/BotUpdates";
-import { Logger } from "./utils/Logger.utils";
 
 export interface SessionData {
   waitingForOrientation?: boolean;
@@ -14,33 +13,42 @@ export interface SessionData {
   };
 }
 
-export interface SessionContext extends Context {
-  session: SessionData;
-}
+export type SessionContext = Context & SessionFlavor<SessionData>;
 
-const bot = new Bot<SessionContext>(config.get("BOT").TOKEN, {
-  client: {
-    apiRoot: "https://api.telegram.org",
-  },
+const BOT_CONFIG = config.get("BOT");
+const bot = new Bot<SessionContext>(BOT_CONFIG.TOKEN, {
+  client: { apiRoot: "https://api.telegram.org" },
 });
+
+bot.use(
+  session({
+    initial: (): SessionData => ({}),
+  })
+);
+
+bot.use(async (ctx, next) => {
+  if (BOT_CONFIG.DEV_MODE && ctx.from?.id !== BOT_CONFIG.ID_DEVELOPER) {
+    await ctx.react("⚡");
+    return;
+  }
+  await next();
+});
+
+bot.use((ctx) => BotUpdate.run(bot, ctx));
+
+bot.catch((err) => Logger.error("Middleware error:", err));
 
 async function bootstrap() {
   try {
-    let url = config.get("BOT").DEV_MODE ? "test" : "main";
-    await mongoose
-      .connect(config.get("BOT").MONGO_URI, {
-        dbName: `${url}`,
-      })
-      .then(async () => {
-        Logger.success("MongoDB успешно подключен.");
-        await BotUpdate.loadModules(path.join(__dirname, "updates"));
-        Logger.info("Модули успешно загружены.");
-        await BotUpdate.register(bot);
-      })
-      .catch((error) => {
-        Logger.error("Ошибка подключения к MongoDB:", error);
-        process.exit(1);
-      });
+    await mongoose.connect(BOT_CONFIG.MONGO_URI, {
+      dbName: BOT_CONFIG.DATABASE,
+    });
+    Logger.success("MongoDB успешно подключен.");
+
+    const modulesPath = path.join(__dirname, "updates");
+    await BotUpdate.loadModules(modulesPath);
+    Logger.info("Модули успешно загружены.");
+    await BotUpdate.register(bot);
 
     await bot.start({
       drop_pending_updates: true,
@@ -51,44 +59,17 @@ async function bootstrap() {
       },
     });
 
-    process.once("SIGINT", () => {
+    const shutdown = () => {
       bot.stop();
       process.exit(0);
-    });
-    process.once("SIGTERM", () => {
-      bot.stop();
-      process.exit(0);
-    });
+    };
+    process.once("SIGINT", shutdown);
+    process.once("SIGTERM", shutdown);
   } catch (error) {
     Logger.error("Критическая ошибка при инициализации:", error);
     process.exit(1);
   }
 }
-
-bot.use((ctx, next) => {
-  if (
-    config.get("BOT").DEV_MODE &&
-    !(ctx?.from?.id === config.get("BOT").ID_DEVELOPER)
-  ) {
-    ctx.react("⚡");
-  } else {
-    return next();
-  }
-});
-
-bot.use(
-  session({
-    initial: () => ({}),
-  })
-);
-
-bot.use(async (ctx: Context) => {
-  await BotUpdate.run(bot, ctx);
-});
-
-bot.catch((err) => {
-  Logger.error("Middleware error:", err);
-});
 
 bootstrap().catch((error) => {
   Logger.error("Необработанная ошибка верхнего уровня:", error);

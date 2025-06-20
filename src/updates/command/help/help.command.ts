@@ -1,5 +1,5 @@
 import { Context } from "grammy";
-import { help } from "../../../utils/fucn.utils";
+import { help } from "../../../lib";
 import BotUpdate from "../../BotUpdates";
 
 export class HelpCommand extends BotUpdate {

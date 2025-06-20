@@ -1,5 +1,5 @@
 import { Context } from "grammy";
-import { start } from "../../../utils/fucn.utils";
+import { start } from "../../../lib";
 import BotUpdate from "../../BotUpdates";
 
 export class StartAction extends BotUpdate {

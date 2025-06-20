@@ -1,5 +1,4 @@
-import sck1 from "../utils/database/user.db";
-import { Logger } from "../utils/Logger.utils";
+import { Logger, sck1 } from "../lib";
 
 type UserJID = number;
 
@@ -17,77 +16,83 @@ export interface EconomyOperations {
   giveLvl: (jid: UserJID, amount: number) => Promise<void>;
 }
 
+// Вспомогательная функция для обработки операций
+async function handleEcoOperation(
+  action: () => Promise<any>, // Разрешены любые промисы
+  successLog: string,
+  errorContext: string
+): Promise<void> {
+  try {
+    await action(); // Ожидаем выполнение операции
+    Logger.success(successLog);
+  } catch (e) {
+    Logger.error(`Ошибка в ${errorContext}: ${e}`);
+    throw e;
+  }
+}
+
 export const eco: EconomyOperations = {
-  giveMyMsg: async function (jid, mentionedJid, amount) {
-    try {
-      await sck1.updateOne({ id: jid }, { $inc: { msg: -amount } });
-      await sck1.updateOne({ id: mentionedJid }, { $inc: { msg: amount } });
-      Logger.success(
-        `[ECO] Пользователь ${jid} передал пользователю ${mentionedJid} - ${amount} MSG`
-      );
-    } catch (e) {
-      Logger.error(`Ошибка в giveMyMsg: ${e}`);
-      throw e;
-    }
-  },
+  giveMyMsg: (jid, mentionedJid, amount) =>
+    handleEcoOperation(
+      async () => {
+        await sck1.updateOne({ id: jid }, { $inc: { msg: -amount } });
+        await sck1.updateOne({ id: mentionedJid }, { $inc: { msg: amount } });
+      },
+      `[ECO] Пользователь ${jid} передал пользователю ${mentionedJid} - ${amount} MSG`,
+      "giveMyMsg"
+    ),
 
-  takeMsg: async function (jid, amount) {
-    try {
-      await sck1.updateOne({ id: jid }, { $inc: { msg: -amount } });
-      Logger.success(`[ECO] Пользователю ${jid} списано ${amount} MSG`);
-    } catch (e) {
-      Logger.error(`Ошибка в takeMsg: ${e}`);
-      throw e;
-    }
-  },
+  takeMsg: (jid, amount) =>
+    handleEcoOperation(
+      async () => {
+        await sck1.updateOne({ id: jid }, { $inc: { msg: -amount } });
+      },
+      `[ECO] Пользователю ${jid} списано ${amount} MSG`,
+      "takeMsg"
+    ),
 
-  takeLvl: async function (jid, amount) {
-    try {
-      await sck1.updateOne({ id: jid }, { $inc: { level: -amount } });
-      Logger.success(`[ECO] Пользователю ${jid} списано ${amount} уровней`);
-    } catch (e) {
-      Logger.error(`Ошибка в takeLvl: ${e}`);
-      throw e;
-    }
-  },
+  takeLvl: (jid, amount) =>
+    handleEcoOperation(
+      async () => {
+        await sck1.updateOne({ id: jid }, { $inc: { level: -amount } });
+      },
+      `[ECO] Пользователю ${jid} списано ${amount} уровней`,
+      "takeLvl"
+    ),
 
-  giveMsg: async function (jid, amount) {
-    try {
-      await sck1.updateOne({ id: jid }, { $inc: { msg: amount } });
-      Logger.success(`[ECO] Пользователю ${jid} выдано ${amount} MSG`);
-    } catch (e) {
-      Logger.error(`Ошибка в giveMsg: ${e}`);
-      throw e;
-    }
-  },
+  giveMsg: (jid, amount) =>
+    handleEcoOperation(
+      async () => {
+        await sck1.updateOne({ id: jid }, { $inc: { msg: amount } });
+      },
+      `[ECO] Пользователю ${jid} выдано ${amount} MSG`,
+      "giveMsg"
+    ),
 
-  setMsg: async function (jid, amount) {
-    try {
-      await sck1.updateOne({ id: jid }, { msg: amount });
-      Logger.success(`[ECO] Пользователю ${jid} установлено ${amount} MSG`);
-    } catch (e) {
-      Logger.error(`Ошибка в setMsg: ${e}`);
-      throw e;
-    }
-  },
+  setMsg: (jid, amount) =>
+    handleEcoOperation(
+      async () => {
+        await sck1.updateOne({ id: jid }, { $set: { msg: amount } });
+      },
+      `[ECO] Пользователю ${jid} установлено ${amount} MSG`,
+      "setMsg"
+    ),
 
-  setLvl: async function (jid, amount) {
-    try {
-      await sck1.updateOne({ id: jid }, { level: amount });
-      Logger.success(`[ECO] Пользователю ${jid} установлен ${amount} уровень`);
-    } catch (e) {
-      Logger.error(`Ошибка в setLvl: ${e}`);
-      throw e;
-    }
-  },
+  setLvl: (jid, amount) =>
+    handleEcoOperation(
+      async () => {
+        await sck1.updateOne({ id: jid }, { $set: { level: amount } });
+      },
+      `[ECO] Пользователю ${jid} установлен ${amount} уровень`,
+      "setLvl"
+    ),
 
-  giveLvl: async function (jid, amount) {
-    try {
-      await sck1.updateOne({ id: jid }, { $inc: { level: amount } });
-      Logger.success(`[ECO] Пользователю ${jid} выдано ${amount} уровней`);
-    } catch (e) {
-      Logger.error(`Ошибка в giveLvl: ${e}`);
-      throw e;
-    }
-  },
+  giveLvl: (jid, amount) =>
+    handleEcoOperation(
+      async () => {
+        await sck1.updateOne({ id: jid }, { $inc: { level: amount } });
+      },
+      `[ECO] Пользователю ${jid} выдано ${amount} уровней`,
+      "giveLvl"
+    ),
 };

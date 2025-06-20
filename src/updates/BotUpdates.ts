@@ -1,11 +1,7 @@
 import fs from "fs/promises";
 import { Bot, Context } from "grammy";
 import path from "path";
-import { config } from "../config/env.config";
-import { reply } from "../config/reply.config";
-import { Logger } from "../utils/Logger.utils";
-import sck1 from "../utils/database/user.db";
-import { isGroup, updateUserData } from "../utils/fucn.utils";
+import { config, isGroup, Logger, reply, sck1, updateUserData } from "../lib";
 import { eco, EconomyOperations } from "./Eco";
 
 const lastCommandUsageTimes = new Map();
@@ -77,9 +73,6 @@ export default class BotUpdate {
   desc: string;
   category: string[];
   isCreator: boolean;
-  reply: any;
-  eco: EconomyOperations;
-  on?: boolean;
   isAdminGroup?: boolean;
   isCreatorGroup?: boolean;
   level?: number;
@@ -90,6 +83,9 @@ export default class BotUpdate {
   isTagRequired?: boolean;
   nsfw?: boolean;
   cooldownTime?: number;
+  reply: any;
+  eco: EconomyOperations;
+  on?: boolean;
 
   constructor(params: ModuleParams) {
     if (!params.on && !params.pattern) {
@@ -121,222 +117,158 @@ export default class BotUpdate {
     ctx: Context,
     moduleParams: ModuleParams
   ): Promise<boolean> {
-    if (!(ctx.from && ctx.chat)) return false;
-    const userId = ctx.from?.id;
+    if (!ctx.from || !ctx.chat) return false;
+
+    const userId = ctx.from.id;
+    const isCallback = !!ctx.update.callback_query;
     const user = await sck1.findOne({ id: userId });
 
-    if (!user) {
-      if (
-        ctx?.message?.text === "/start" ||
-        ctx?.message?.text === "/s" ||
-        ctx?.update?.callback_query?.data == `set_orientation:${userId}`
-      ) {
-        return true;
+    const replyError = async (text: string, showAlert = false) => {
+      if (isCallback) {
+        await ctx
+          .answerCallbackQuery({ text, show_alert: showAlert })
+          .catch(() => {});
+      } else if (ctx.msg) {
+        await ctx.reply(text, {
+          reply_parameters: { message_id: ctx.msg.message_id },
+        });
       }
-      return false;
+    };
+
+    if (!user) {
+      const isAllowed =
+        ctx.message?.text === "/start" ||
+        ctx.message?.text === "/s" ||
+        ctx.update.callback_query?.data === `set_orientation:${userId}`;
+      return isAllowed;
     }
 
     if (moduleParams.isCreator) {
       const developerId = Number(config.get("BOT").ID_DEVELOPER);
-
       if (userId !== developerId) {
-        if (ctx.update.callback_query) {
-          await ctx
-            .answerCallbackQuery(
-              reply.ru.BotUpdates.creatorAccessDeniedCallback
-            )
-            .catch(() => {});
-        } else {
-          if (!ctx.msg) return false;
-          await ctx.reply(reply.ru.BotUpdates.creatorCommandRestricted, {
-            reply_parameters: { message_id: ctx.msg.message_id },
-          });
-        }
+        const message = isCallback
+          ? reply.ru.BotUpdates.creatorAccessDeniedCallback
+          : reply.ru.BotUpdates.creatorCommandRestricted;
+
+        await replyError(message, isCallback);
         return false;
       }
     }
 
-    /// тут кулдаун нужно делать
     if (moduleParams.cooldownTime) {
       const currentTime = Date.now();
-      const lastConnectCommandTime =
-        lastCommandUsageTimes.get(ctx.chat.id) || 0;
-      const timeElapsed = currentTime - lastConnectCommandTime;
+      const lastTime = lastCommandUsageTimes.get(ctx.chat.id) || 0;
+      const elapsed = currentTime - lastTime;
 
-      if (timeElapsed < moduleParams.cooldownTime) {
-        const remainingTime = moduleParams.cooldownTime - timeElapsed;
-        const remainingHours = Math.floor(remainingTime / 3600000);
-        const remainingMinutes = Math.floor((remainingTime % 3600000) / 60000);
-        const remainingSeconds = Math.floor((remainingTime % 60000) / 1000);
+      if (elapsed < moduleParams.cooldownTime) {
+        const remaining = moduleParams.cooldownTime - elapsed;
+        const hours = Math.floor(remaining / 3600000);
+        const minutes = Math.floor((remaining % 3600000) / 60000);
+        const seconds = Math.floor((remaining % 60000) / 1000);
 
-        let remainingTimeString = "";
-        if (remainingHours > 0)
-          remainingTimeString += `${remainingHours} часов `;
-        if (remainingMinutes > 0)
-          remainingTimeString += `${remainingMinutes} минут `;
-        if (remainingSeconds > 0)
-          remainingTimeString += `${remainingSeconds} секунд`;
+        const timeParts = [];
+        if (hours) timeParts.push(`${hours} часов`);
+        if (minutes) timeParts.push(`${minutes} минут`);
+        if (seconds) timeParts.push(`${seconds} секунд`);
+        const remainingTime = timeParts.join(" ") || "0 секунд";
 
-        if (ctx.update.callback_query) {
-          await bot.api
-            .answerCallbackQuery(
-              `❗ Ошибка\n\n> Данная команда доступна раз в ${moduleParams.cooldownTime} мс, повторите попытку через - ${remainingTimeString}`,
-              {
-                show_alert: true,
-              }
-            )
+        const errorMsg = `❗ Ошибка\n\n> Данная команда доступна раз в ${moduleParams.cooldownTime} мс, повторите попытку через - ${remainingTime}`;
+
+        if (isCallback) {
+          await ctx
+            .answerCallbackQuery({ text: errorMsg, show_alert: true })
             .catch(() => {});
+        } else if (ctx.msg) {
+          const { message_id } = await ctx.reply(
+            `<b>❗ Ошибка</b>\n\n> Данная команда доступна раз в ${moduleParams.cooldownTime} мс, повторите попытку через - <b>${remainingTime}</b>`,
+            {
+              parse_mode: "HTML",
+              reply_parameters: { message_id: ctx.msg.message_id },
+            }
+          );
+          await new Promise((resolve) => setTimeout(resolve, 4000));
+          await bot.api.deleteMessage(ctx.chat.id, message_id).catch(() => {});
         }
-
-        if (!ctx.msg) return false;
-
-        const { message_id } = await ctx.reply(
-          `<b>❗ Ошибка</b>\n\n> Данная команда доступна раз в ${moduleParams.cooldownTime} мс, повторите попытку через - <b>${remainingTimeString}</b>`,
-          {
-            parse_mode: "HTML",
-            reply_parameters: { message_id: ctx.msg.message_id },
-          }
-        );
-        await new Promise((resolve) => setTimeout(resolve, 4000));
-        await ctx.deleteMessage();
         return false;
       }
-
       lastCommandUsageTimes.set(ctx.chat.id, currentTime);
     }
 
-    if (moduleParams.isGroupOnly) {
-      if (!isGroup(ctx)) {
-        if (ctx.update.callback_query) {
-          await ctx.answerCallbackQuery(`✖️ Ты не в группе!`).catch(() => {});
-        } else {
-          if (!ctx.msg) return false;
-          await ctx.reply(`✖️ Ты не в группе!`, {
-            reply_parameters: { message_id: ctx.msg.message_id },
-          });
-        }
+    const checkGroupCondition = async (
+      condition: boolean,
+      errorText: string
+    ): Promise<boolean> => {
+      if (!condition) {
+        await replyError(errorText);
         return false;
       }
+      return true;
+    };
+
+    if (
+      (moduleParams.isGroupOnly &&
+        !(await checkGroupCondition(isGroup(ctx), "✖️ Ты не в группе!"))) ||
+      (moduleParams.isPrivateOnly &&
+        !(await checkGroupCondition(!isGroup(ctx), "✖️ Ты в группе!")))
+    ) {
+      return false;
     }
 
-    if (moduleParams.isAdminGroup) {
-      if (
-        !["administrator", "creator"].includes(
-          (await ctx.getChatMember(ctx.from.id)).status
-        )
-      ) {
-        if (ctx.update.callback_query) {
-          await ctx
-            .answerCallbackQuery(`✖️ Ты не админ в группе!`)
-            .catch(() => {});
-        } else {
-          if (!ctx.msg) return false;
-          await ctx.reply(`✖️ Ты не админ в группе!`, {
-            reply_parameters: { message_id: ctx.msg.message_id },
-          });
-        }
+    const checkRole = async (requiredStatus: string[], errorText: string) => {
+      if (!ctx.chat) return false;
+      const status = (await ctx.getChatMember(userId)).status;
+      if (!requiredStatus.includes(status)) {
+        await replyError(errorText);
         return false;
       }
+      return true;
+    };
+
+    if (
+      (moduleParams.isAdminGroup &&
+        !(await checkRole(
+          ["administrator", "creator"],
+          "✖️ Ты не админ в группе!"
+        ))) ||
+      (moduleParams.isCreatorGroup &&
+        !(await checkRole(["creator"], "✖️ Ты не создатель группы!")))
+    ) {
+      return false;
     }
 
-    if (moduleParams.isCreatorGroup) {
-      if (
-        !["creator"].includes((await ctx.getChatMember(ctx.from.id)).status)
-      ) {
-        if (ctx.update.callback_query) {
-          await ctx
-            .answerCallbackQuery(`✖️ Ты не создатель группы!`)
-            .catch(() => {});
-        } else {
-          if (!ctx.msg) return false;
-          await ctx.reply(`✖️ Ты не создатель группы!`, {
-            reply_parameters: { message_id: ctx.msg.message_id },
-          });
-        }
+    const checkResource = async (
+      hasEnough: boolean,
+      errorText: string
+    ): Promise<boolean> => {
+      if (!hasEnough) {
+        await replyError(errorText);
         return false;
       }
+      return true;
+    };
+
+    if (
+      (moduleParams.level &&
+        !(await checkResource(
+          user.level >= moduleParams.level,
+          "✖️ У вас недостаточно уровня! Чтобы его повысить, используйте /levelup"
+        ))) ||
+      (moduleParams.priceMsg &&
+        !(await checkResource(
+          user.msg >= moduleParams.priceMsg,
+          "✖️ Вам не хватает сообщений для совершения покупки! Купить: /donate"
+        ))) ||
+      (moduleParams.priceLvl &&
+        !(await checkResource(
+          user.level >= moduleParams.priceLvl,
+          "✖️ Вам не хватает уровня для совершения покупки! Купить уровень: /levelup"
+        )))
+    ) {
+      return false;
     }
 
-    if (moduleParams.isPrivateOnly) {
-      if (isGroup(ctx)) {
-        if (ctx.update.callback_query) {
-          await ctx.answerCallbackQuery(`✖️ Ты в группе!`).catch(() => {});
-        } else {
-          if (!ctx.msg) return false;
-          await ctx.reply(`✖️ Ты в группе!`, {
-            reply_parameters: { message_id: ctx.msg.message_id },
-          });
-        }
-        return false;
-      }
-    }
-
-    if (moduleParams.level) {
-      if (user.level < moduleParams.level) {
-        if (ctx.update.callback_query) {
-          await ctx
-            .answerCallbackQuery(
-              `✖️ У вас недостаточно уровня! Чтобы его повысить, используйте /levelup`
-            )
-            .catch(() => {});
-        } else {
-          if (!ctx.msg) return false;
-          await ctx.reply(
-            `✖️ У вас недостаточно уровня! Чтобы его повысить, используйте /levelup`,
-            {
-              reply_parameters: { message_id: ctx.msg.message_id },
-            }
-          );
-        }
-        return false;
-      }
-    }
-
-    if (moduleParams.priceMsg) {
-      if (user.msg < moduleParams.priceMsg) {
-        if (ctx.update.callback_query) {
-          await ctx
-            .answerCallbackQuery(
-              `✖️ Вам не хватает сообщений для совершения покупки! Купить: /donate`
-            )
-            .catch(() => {});
-        } else {
-          if (!ctx.msg) return false;
-          await ctx.reply(
-            `✖️ Вам не хватает сообщений для совершения покупки! Купить: /donate`,
-            {
-              reply_parameters: { message_id: ctx.msg.message_id },
-            }
-          );
-        }
-        return false;
-      } else {
-        await eco.takeMsg(ctx.from.id, moduleParams.priceMsg);
-      }
-    }
-
-    if (moduleParams.priceLvl) {
-      if (user.level < moduleParams.priceLvl) {
-        if (ctx.update.callback_query) {
-          await ctx
-            .answerCallbackQuery(
-              `✖️ Вам не хватает уровня для совершения покупки! Купить уровень: /levelup`
-            )
-            .catch(() => {});
-        } else {
-          if (!ctx.msg) return false;
-          await ctx.reply(
-            `✖️ Вам не хватает уровня для совершения покупки! Купить уровень: /levelup`,
-            {
-              reply_parameters: { message_id: ctx.msg.message_id },
-            }
-          );
-        }
-        return false;
-      } else {
-        await eco.takeLvl(ctx.from.id, moduleParams.priceLvl);
-      }
-    }
+    if (moduleParams.priceMsg) await eco.takeMsg(userId, moduleParams.priceMsg);
+    if (moduleParams.priceLvl) await eco.takeLvl(userId, moduleParams.priceLvl);
 
     return true;
   }
@@ -371,17 +303,18 @@ export default class BotUpdate {
   }
 
   static async loadModules(dir: string) {
+    const tsNode = path.join(`${__dirname}/..`).endsWith("src") ? ".ts" : ".js";
     try {
       const files = await fs.readdir(dir);
       for (const file of files) {
         const filePath = path.join(dir, file);
         const stat = await fs.stat(filePath);
 
-        if (dir === __dirname && file.endsWith(".ts")) continue;
+        if (dir === __dirname && file.endsWith(tsNode)) continue;
 
         if (stat.isDirectory()) {
           await this.loadModules(filePath);
-        } else if (file.endsWith(".ts")) {
+        } else if (file.endsWith(tsNode)) {
           try {
             const Module = await import(filePath);
             const ModuleClass = Object.values(Module).find(
@@ -397,7 +330,7 @@ export default class BotUpdate {
                 ...instance,
               };
 
-              if (file.endsWith(".event.ts")) {
+              if (file.endsWith(`.event${tsNode}`)) {
                 moduleData.on = true;
                 moduleData.pattern = undefined;
                 Logger.success(

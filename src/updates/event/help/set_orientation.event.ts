@@ -1,5 +1,5 @@
 import { Bot } from "grammy";
-import { config } from "../../../config/env.config";
+import { config } from "../../../lib";
 import { SessionContext } from "../../../main";
 import BotUpdate from "../../BotUpdates";
 

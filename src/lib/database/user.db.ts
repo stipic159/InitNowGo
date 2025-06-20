@@ -47,4 +47,4 @@ const UserSchema = new mongoose.Schema({
 });
 
 const sck1 = mongoose.model("user", UserSchema);
-export = sck1;
+export { sck1 };
