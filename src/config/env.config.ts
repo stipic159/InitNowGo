@@ -54,7 +54,7 @@ export class Config {
           "https://raw.githubusercontent.com/SecktorBot/Brandimages/main/logos/SocialLogo%201.png", // todo
         VERSION: process.env.BOT_VERSION!,
         ID_DEVELOPER: Number(process.env.BOT_ID_DEVELOPER!)!,
-        DEV_MODE: process.env.BOT_NODE_ENV! === "development",
+        DEV_MODE: process.env.BOT_NODE_ENV! === "dev",
         SUPPORT_ID: Number(process.env.BOT_SUPPORT_ID!)!,
         TOKEN: process.env.BOT_TOKEN!,
         MONGO_URI: process.env.BOT_MONGO_URI!,

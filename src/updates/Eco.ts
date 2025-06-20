@@ -1,10 +1,8 @@
 import sck1 from "../utils/database/user.db";
 import { Logger } from "../utils/Logger.utils";
 
-// Тип для идентификаторов пользователей (JID)
 type UserJID = number;
 
-// Интерфейс для экономических операций
 export interface EconomyOperations {
   giveMyMsg: (
     jid: UserJID,

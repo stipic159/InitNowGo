@@ -1,5 +1,5 @@
 import fs from "fs/promises";
-import { Context } from "grammy";
+import { Bot, Context } from "grammy";
 import path from "path";
 import { config } from "../config/env.config";
 import { reply } from "../config/reply.config";
@@ -7,6 +7,8 @@ import { Logger } from "../utils/Logger.utils";
 import sck1 from "../utils/database/user.db";
 import { isGroup, updateUserData } from "../utils/fucn.utils";
 import { eco, EconomyOperations } from "./Eco";
+
+const lastCommandUsageTimes = new Map();
 
 const MESSAGE_TYPES: string[] = [
   "text",
@@ -101,20 +103,21 @@ export default class BotUpdate {
     this.isCreator = params.isCreator || false; // ✔️
     this.isAdminGroup = params.isAdminGroup || false; // ✔️
     this.isCreatorGroup = params.isCreatorGroup || false; // ✔️
-    this.level = params.level || 1; //
-    this.priceMsg = params.priceMsg || 0; //
-    this.priceLvl = params.priceLvl || 0; //
+    this.level = params.level || 1; // ✔️
+    this.priceMsg = params.priceMsg || 0; // ✔️
+    this.priceLvl = params.priceLvl || 0; // ✔️
     this.isGroupOnly = params.isGroupOnly || false; // ✔️
-    this.isPrivateOnly = params.isPrivateOnly || false; //
-    this.isTagRequired = params.isTagRequired || false; //
-    this.nsfw = params.nsfw || false; //
-    this.cooldownTime = params.cooldownTime || 0; //
+    this.isPrivateOnly = params.isPrivateOnly || false; // ✔️
+    this.isTagRequired = params.isTagRequired || false; // todo
+    this.nsfw = params.nsfw || false; // todo
+    this.cooldownTime = params.cooldownTime || 0; // ✔️
     this.reply = reply; // ✔️
     this.eco = eco; // ✔️
     this.on = params.on; // ✔️
   }
 
   private static async validateModuleAccess(
+    bot: Bot<Context>,
     ctx: Context,
     moduleParams: ModuleParams
   ): Promise<boolean> {
@@ -132,6 +135,7 @@ export default class BotUpdate {
       }
       return false;
     }
+
     if (moduleParams.isCreator) {
       const developerId = Number(config.get("BOT").ID_DEVELOPER);
 
@@ -150,6 +154,55 @@ export default class BotUpdate {
         }
         return false;
       }
+    }
+
+    /// тут кулдаун нужно делать
+    if (moduleParams.cooldownTime) {
+      const currentTime = Date.now();
+      const lastConnectCommandTime =
+        lastCommandUsageTimes.get(ctx.chat.id) || 0;
+      const timeElapsed = currentTime - lastConnectCommandTime;
+
+      if (timeElapsed < moduleParams.cooldownTime) {
+        const remainingTime = moduleParams.cooldownTime - timeElapsed;
+        const remainingHours = Math.floor(remainingTime / 3600000);
+        const remainingMinutes = Math.floor((remainingTime % 3600000) / 60000);
+        const remainingSeconds = Math.floor((remainingTime % 60000) / 1000);
+
+        let remainingTimeString = "";
+        if (remainingHours > 0)
+          remainingTimeString += `${remainingHours} часов `;
+        if (remainingMinutes > 0)
+          remainingTimeString += `${remainingMinutes} минут `;
+        if (remainingSeconds > 0)
+          remainingTimeString += `${remainingSeconds} секунд`;
+
+        if (ctx.update.callback_query) {
+          await bot.api
+            .answerCallbackQuery(
+              `❗ Ошибка\n\n> Данная команда доступна раз в ${moduleParams.cooldownTime} мс, повторите попытку через - ${remainingTimeString}`,
+              {
+                show_alert: true,
+              }
+            )
+            .catch(() => {});
+        }
+
+        if (!ctx.msg) return false;
+
+        const { message_id } = await ctx.reply(
+          `<b>❗ Ошибка</b>\n\n> Данная команда доступна раз в ${moduleParams.cooldownTime} мс, повторите попытку через - <b>${remainingTimeString}</b>`,
+          {
+            parse_mode: "HTML",
+            reply_parameters: { message_id: ctx.msg.message_id },
+          }
+        );
+        await new Promise((resolve) => setTimeout(resolve, 4000));
+        await ctx.deleteMessage();
+        return false;
+      }
+
+      lastCommandUsageTimes.set(ctx.chat.id, currentTime);
     }
 
     if (moduleParams.isGroupOnly) {
@@ -243,13 +296,18 @@ export default class BotUpdate {
       if (user.msg < moduleParams.priceMsg) {
         if (ctx.update.callback_query) {
           await ctx
-            .answerCallbackQuery(`✖️ У вас недостаточно сообщений!`)
+            .answerCallbackQuery(
+              `✖️ Вам не хватает сообщений для совершения покупки! Купить: /donate`
+            )
             .catch(() => {});
         } else {
           if (!ctx.msg) return false;
-          await ctx.reply(`✖️ У вас недостаточно сообщений!`, {
-            reply_parameters: { message_id: ctx.msg.message_id },
-          });
+          await ctx.reply(
+            `✖️ Вам не хватает сообщений для совершения покупки! Купить: /donate`,
+            {
+              reply_parameters: { message_id: ctx.msg.message_id },
+            }
+          );
         }
         return false;
       } else {
@@ -261,15 +319,22 @@ export default class BotUpdate {
       if (user.level < moduleParams.priceLvl) {
         if (ctx.update.callback_query) {
           await ctx
-            .answerCallbackQuery(`✖️ У вас недостаточно уровня!`)
+            .answerCallbackQuery(
+              `✖️ Вам не хватает уровня для совершения покупки! Купить уровень: /levelup`
+            )
             .catch(() => {});
         } else {
           if (!ctx.msg) return false;
-          await ctx.reply(`✖️ У вас недостаточно уровня!`, {
-            reply_parameters: { message_id: ctx.msg.message_id },
-          });
+          await ctx.reply(
+            `✖️ Вам не хватает уровня для совершения покупки! Купить уровень: /levelup`,
+            {
+              reply_parameters: { message_id: ctx.msg.message_id },
+            }
+          );
         }
         return false;
+      } else {
+        await eco.takeLvl(ctx.from.id, moduleParams.priceLvl);
       }
     }
 
@@ -290,14 +355,6 @@ export default class BotUpdate {
         const { class: ModuleClass, pattern } = moduleInfo;
         const instance = new ModuleClass();
         bot.use(instance.execute.bind(instance));
-        const patternString = pattern
-          ? Array.isArray(pattern)
-            ? pattern.join(", ")
-            : pattern.toString()
-          : "";
-        Logger.info(
-          reply.ru.moduleLogs.commandModule(ModuleClass.name, patternString)
-        );
       } catch (error: any) {
         Logger.error(reply.ru.BotUpdates.moduleRegistrationError, error);
       }
@@ -307,7 +364,6 @@ export default class BotUpdate {
       try {
         const instance = new moduleInfo.class();
         bot.use(instance.execute.bind(instance));
-        Logger.info(reply.ru.moduleLogs.globalHandler(moduleInfo.class.name));
       } catch (error) {
         Logger.error(reply.ru.BotUpdates.eventHandlerError, error);
       }
@@ -440,7 +496,11 @@ export default class BotUpdate {
 
       const { commandModule } = BotUpdate.find(command);
       if (commandModule) {
-        const hasAccess = await this.validateModuleAccess(ctx, commandModule);
+        const hasAccess = await this.validateModuleAccess(
+          bot,
+          ctx,
+          commandModule
+        );
         if (!hasAccess) return;
         const groupInfo = isGroup(ctx)
           ? `GId: ${ctx.chat?.id}, GN: ${ctx.chat?.title}`
@@ -532,7 +592,11 @@ export default class BotUpdate {
 
       const { commandModule } = this.find(command);
       if (commandModule) {
-        const hasAccess = await this.validateModuleAccess(ctx, commandModule);
+        const hasAccess = await this.validateModuleAccess(
+          bot,
+          ctx,
+          commandModule
+        );
         if (!hasAccess) return;
 
         const instance = new commandModule.class();

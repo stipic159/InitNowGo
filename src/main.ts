@@ -26,12 +26,21 @@ const bot = new Bot<SessionContext>(config.get("BOT").TOKEN, {
 
 async function bootstrap() {
   try {
-    await mongoose.connect(config.get("BOT").MONGO_URI);
-    Logger.success("MongoDB успешно подключен.");
-    await BotUpdate.loadModules(path.join(__dirname, "updates"));
-    Logger.info("Модули успешно загружены.");
-
-    await BotUpdate.register(bot);
+    let url = config.get("BOT").DEV_MODE ? "test" : "main";
+    await mongoose
+      .connect(config.get("BOT").MONGO_URI, {
+        dbName: `${url}`,
+      })
+      .then(async () => {
+        Logger.success("MongoDB успешно подключен.");
+        await BotUpdate.loadModules(path.join(__dirname, "updates"));
+        Logger.info("Модули успешно загружены.");
+        await BotUpdate.register(bot);
+      })
+      .catch((error) => {
+        Logger.error("Ошибка подключения к MongoDB:", error);
+        process.exit(1);
+      });
 
     await bot.start({
       drop_pending_updates: true,

@@ -3,7 +3,6 @@ import { config } from "../../../config/env.config";
 import { SessionContext } from "../../../main";
 import BotUpdate from "../../BotUpdates";
 
-// Функция для экранирования HTML-символов
 function escapeHtml(unsafe: string): string {
   return unsafe
     .replace(/&/g, "&amp;")
@@ -62,7 +61,6 @@ export class OrientationEvent extends BotUpdate {
       const user = await sck1.findOne({ id: userId });
       const escapedOrientation = escapeHtml(orientationText);
 
-      // Обработка нового пользователя
       if (!user) {
         const loadingSteps = [
           "⏳ Загрузка, пожалуйста, подождите...",
@@ -82,7 +80,6 @@ export class OrientationEvent extends BotUpdate {
           );
         }
 
-        // Создание пользователя с бонусами
         const currentDate = new Date();
         const endDate = new Date();
         endDate.setDate(currentDate.getDate() + 14);
@@ -106,9 +103,8 @@ export class OrientationEvent extends BotUpdate {
           },
         });
 
-        // HTML-форматированное приветствие
         const welcomeMessage =
-          `<b>🌟 Привет, новобранец! 🌟</b>\n\n` +
+          `<b>🌟 Поздравляю! 🌟</b>\n\n` +
           `Твоя ориентация → <i>${escapedOrientation}</i> успешно установлена. 🎉\n` +
           "И у нас для тебя <b>подарок</b> за регистрацию:\n" +
           "🎁 <b>VIP-статус на 14 дней</b>\n" +
@@ -125,6 +121,7 @@ export class OrientationEvent extends BotUpdate {
           loadingMsgId,
           welcomeMessage,
           {
+            link_preview_options: { is_disabled: true },
             parse_mode: "HTML",
             reply_markup: {
               inline_keyboard: [
@@ -141,7 +138,6 @@ export class OrientationEvent extends BotUpdate {
 
         Logger.success(`Новая запись создана с бонусами! ID: ${userId}`);
       } else {
-        // Обновление существующего пользователя
         await sck1.updateOne(
           { id: userId },
           { $set: { orientation: orientationText } }
@@ -168,7 +164,6 @@ export class OrientationEvent extends BotUpdate {
       console.error(e);
       await ctx.reply("Произошла ошибка при обработке вашего запроса.");
     } finally {
-      // Сброс состояния сессии
       session.waitingForOrientation = false;
       delete session.pendingOrientation;
       session.errorMessageIdsOrientation = [];
