@@ -24,9 +24,11 @@ const MESSAGE_TYPES: string[] = [
   "animation",
   "passport_data",
 ];
+
 const DATABASES = {
   sck1,
 };
+
 const UPDATE_TYPES: string[] = [
   "new_chat_members",
   "left_chat_member",
@@ -114,6 +116,51 @@ export default class BotUpdate {
     this.on = params.on; // ✔️
   }
 
+  static categoryNameMap = new Map<number, string>();
+  static categoryIdMap = new Map<string, number>();
+
+  static async register(bot: Bot) {
+    const allCategories = new Set<string>();
+    for (const module of this.loadedModules.values()) {
+      if (module.category && Array.isArray(module.category)) {
+        module.category.forEach((cat) => allCategories.add(cat));
+      }
+    }
+
+    const sortedCategories = Array.from(allCategories).sort();
+    BotUpdate.categoryIdMap.clear();
+    sortedCategories.forEach((category, index) => {
+      BotUpdate.categoryIdMap.set(category, index + 1);
+    });
+
+    BotUpdate.categoryNameMap.clear();
+    for (const [category, id] of BotUpdate.categoryIdMap.entries()) {
+      BotUpdate.categoryNameMap.set(id, category);
+    }
+
+    const patternModules = Array.from(this.loadedModules.values()).filter((m) => !m.on);
+    const eventModules = Array.from(this.loadedModules.values()).filter((m) => m.on === true);
+
+    for (const moduleInfo of patternModules) {
+      try {
+        const { class: ModuleClass } = moduleInfo;
+        const instance = new ModuleClass();
+        bot.use(instance.execute.bind(instance) as any);
+      } catch (error: any) {
+        Logger.error(reply.ru.BotUpdates.moduleRegistrationError, error);
+      }
+    }
+
+    for (const moduleInfo of eventModules) {
+      try {
+        const instance = new moduleInfo.class();
+        bot.use(instance.execute.bind(instance) as any);
+      } catch (error) {
+        Logger.error(reply.ru.BotUpdates.eventHandlerError, error);
+      }
+    }
+  }
+
   private static async validateModuleAccess(bot: Bot<Context>, ctx: Context, moduleParams: ModuleParams): Promise<boolean> {
     if (!ctx.from || !ctx.chat) return false;
 
@@ -124,10 +171,19 @@ export default class BotUpdate {
     const replyError = async (text: string, showAlert = false) => {
       if (isCallback) {
         await ctx.answerCallbackQuery({ text, show_alert: showAlert }).catch(() => {});
-      } else if (ctx.msg) {
-        await ctx.reply(text, {
-          reply_parameters: { message_id: ctx.msg.message_id },
+      } else if (ctx.msg && ctx.chat) {
+        const chatId = ctx.chat.id;
+        const originalMessageId = ctx.msg.message_id;
+
+        const message = await ctx.reply(text, {
+          reply_parameters: { message_id: originalMessageId },
         });
+        setTimeout(async () => {
+          try {
+            bot.api.deleteMessage(chatId, originalMessageId).catch(() => {});
+            bot.api.deleteMessage(chatId, message.message_id).catch(() => {});
+          } catch {}
+        }, 4000);
       }
     };
 
@@ -136,9 +192,14 @@ export default class BotUpdate {
         ctx.message?.text === "/start" ||
         ctx.message?.text === "/s" ||
         ctx.update.callback_query?.data === `set_orientation:${userId}`;
+      if (!isAllowed) {
+        await replyError("Вы не зарегестрированы в базе данных бота... Для регистрации используйте команду /start.", true);
+      }
       return isAllowed;
     }
-
+    if (isCallback && !ctx.update.callback_query?.data?.endsWith(String(ctx.from.id))) {
+      await ctx.answerCallbackQuery({ text: "Эта кнопка не для вас!", show_alert: true }).catch(() => {});
+    }
     if (moduleParams.isCreator) {
       const developerId = Number(config.get("BOT").ID_DEVELOPER);
       if (userId !== developerId) {
@@ -173,6 +234,9 @@ export default class BotUpdate {
         if (isCallback) {
           await ctx.answerCallbackQuery({ text: errorMsg, show_alert: true }).catch(() => {});
         } else if (ctx.msg) {
+          const chatId = ctx.chat.id;
+          const originalMessageId = ctx.msg.message_id;
+
           const { message_id } = await ctx.reply(
             `<b>❗ Ошибка</b>\n\n> Данная команда доступна раз в ${moduleParams.cooldownTime} мс, повторите попытку через - <b>${remainingTime}</b>`,
             {
@@ -180,8 +244,10 @@ export default class BotUpdate {
               reply_parameters: { message_id: ctx.msg.message_id },
             }
           );
-          await new Promise((resolve) => setTimeout(resolve, 4000));
-          await bot.api.deleteMessage(ctx.chat.id, message_id).catch(() => {});
+
+          setTimeout(async () => {
+            await bot.api.deleteMessage(chatId, originalMessageId).catch(() => {});
+          }, 4000);
         }
         return false;
       }
@@ -256,31 +322,6 @@ export default class BotUpdate {
 
   static getByType(type: "command" | "action" | "event"): LoadedModule[] {
     return Array.from(this.loadedModules.values()).filter((m) => m.moduleType === type);
-  }
-
-  static async register(bot: Bot) {
-    const patternModules = Array.from(this.loadedModules.values()).filter((m) => !m.on);
-
-    const eventModules = Array.from(this.loadedModules.values()).filter((m) => m.on === true);
-
-    for (const moduleInfo of patternModules) {
-      try {
-        const { class: ModuleClass, pattern } = moduleInfo;
-        const instance = new ModuleClass();
-        bot.use(instance.execute.bind(instance) as any);
-      } catch (error: any) {
-        Logger.error(reply.ru.BotUpdates.moduleRegistrationError, error);
-      }
-    }
-
-    for (const moduleInfo of eventModules) {
-      try {
-        const instance = new moduleInfo.class();
-        bot.use(instance.execute.bind(instance) as any);
-      } catch (error) {
-        Logger.error(reply.ru.BotUpdates.eventHandlerError, error);
-      }
-    }
   }
 
   static async loadModules(dir: string) {
@@ -388,11 +429,15 @@ export default class BotUpdate {
 
       if (ctx.message && "text" in ctx.message && ctx.message.text) {
         const fullText = ctx.message.text.trim();
-        const commandRegex = new RegExp(`^/?([a-zA-Z0-9_]+)(?:@${botUsername})?\\s*([\\s\\S]*)$`, "i");
+        const commandRegex = new RegExp(`^/([a-zA-Z0-9_]+)(?:@([a-zA-Z0-9_]+))?\\s*([\\s\\S]*)$`, "i");
         const match = fullText.match(commandRegex);
 
         if (match) {
-          const [, rawCommand, paramsText] = match;
+          const [, rawCommand, mentionedBot, paramsText] = match;
+          if (mentionedBot && mentionedBot.toLowerCase() !== botUsername) {
+            return;
+          }
+
           command = rawCommand.toLowerCase();
           text = paramsText.trim();
           args = [command, ...text.split(/\s+/).filter(Boolean)];

@@ -12,14 +12,9 @@ export interface EconomyOperations {
   giveLvl: (jid: UserJID, amount: number) => Promise<void>;
 }
 
-// Вспомогательная функция для обработки операций
-async function handleEcoOperation(
-  action: () => Promise<any>, // Разрешены любые промисы
-  successLog: string,
-  errorContext: string
-): Promise<void> {
+async function handleEcoOperation(action: () => Promise<any>, successLog: string, errorContext: string): Promise<void> {
   try {
-    await action(); // Ожидаем выполнение операции
+    await action();
     Logger.success(successLog);
   } catch (e) {
     Logger.error(`Ошибка в ${errorContext}: ${e}`);

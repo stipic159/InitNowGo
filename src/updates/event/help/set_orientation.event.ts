@@ -91,8 +91,7 @@ export class OrientationEvent extends BotUpdate {
           "Подарки уже активированы, проверь их с помощью команды:\n" +
           "🎁 /rank\n\n" +
           `<b>Список команд бота:</b> /help\n` +
-          `🙋‍♂️ <b>Поддержка:</b> <a href="https://t.me/${supportUsername}">@${supportUsername}</a>\n` +
-          "⚖️ <b>Все права защищены:</b> ING (2025)";
+          `🙋‍♂️ <b>Поддержка:</b> <a href="https://t.me/${supportUsername}">@${supportUsername}</a>`;
 
         await bot.api.editMessageText(ctx.chat.id, loadingMsgId, welcomeMessage, {
           link_preview_options: { is_disabled: true },
