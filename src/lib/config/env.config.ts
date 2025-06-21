@@ -46,9 +46,7 @@ export class Config {
 
     return {
       BOT: {
-        THUMB_IMAGE:
-          process.env.BOT_THUMB_IMAGE ||
-          "https://raw.githubusercontent.com/.../logo.png",
+        THUMB_IMAGE: process.env.BOT_THUMB_IMAGE || "https://raw.githubusercontent.com/.../logo.png",
         VERSION: pack.version!,
         ID_DEVELOPER: Number(process.env.BOT_ID_DEVELOPER!),
         DEV_MODE: isDev,

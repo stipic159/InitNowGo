@@ -1,6 +1,4 @@
-import { Context } from "grammy";
-import { help } from "../../../lib";
-import BotUpdate from "../../BotUpdates";
+import { Bot, BotUpdate, Context, ExecuteParams, help } from "../../../lib";
 
 export class HelpCommand extends BotUpdate {
   constructor() {
@@ -12,11 +10,7 @@ export class HelpCommand extends BotUpdate {
     });
   }
 
-  async execute(
-    bot: any,
-    ctx: Context,
-    { text, args, Logger }: any
-  ): Promise<void> {
+  async execute(bot: Bot, ctx: Context, { text, args, Logger }: ExecuteParams): Promise<void> {
     await help(bot, ctx, { text, args, Logger });
   }
 }

@@ -41,23 +41,10 @@ class FileTransport {
   }
 }
 
-type LogLevel =
-  | "info"
-  | "error"
-  | "warn"
-  | "debug"
-  | "success"
-  | "message"
-  | "command"
-  | "update";
+type LogLevel = "info" | "error" | "warn" | "debug" | "success" | "message" | "command" | "update";
 
 export class Logger {
-  private static log(
-    level: LogLevel,
-    color: (s: string) => string,
-    message: string,
-    ...args: unknown[]
-  ) {
+  private static log(level: LogLevel, color: (s: string) => string, message: string, ...args: unknown[]) {
     const prefix = `[${level.toUpperCase()}]`;
     console.log(color(`${prefix} ${message}`), ...args);
     FileTransport.write(level, message);

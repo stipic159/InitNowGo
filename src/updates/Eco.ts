@@ -3,11 +3,7 @@ import { Logger, sck1 } from "../lib";
 type UserJID = number;
 
 export interface EconomyOperations {
-  giveMyMsg: (
-    jid: UserJID,
-    mentionedJid: UserJID,
-    amount: number
-  ) => Promise<void>;
+  giveMyMsg: (jid: UserJID, mentionedJid: UserJID, amount: number) => Promise<void>;
   takeMsg: (jid: UserJID, amount: number) => Promise<void>;
   takeLvl: (jid: UserJID, amount: number) => Promise<void>;
   giveMsg: (jid: UserJID, amount: number) => Promise<void>;

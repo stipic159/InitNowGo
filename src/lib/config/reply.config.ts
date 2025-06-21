@@ -9,8 +9,7 @@ export const reply = {
     oftUsed: {},
     command: {},
     BotUpdates: {
-      creatorAccessDeniedCallback:
-        "🚨 Недостаточно прав! Только создатель может использовать эту команду",
+      creatorAccessDeniedCallback: "🚨 Недостаточно прав! Только создатель может использовать эту команду",
       creatorCommandRestricted: "🚷 Команда доступна только создателю",
       callbackQueryError: "Ошибка запроса",
       callbackExecutionError: "⚠️ Ошибка выполнения",
@@ -27,17 +26,13 @@ export const reply = {
       executeNotImplemented: "❌ Метод execute не реализован в классе",
     },
     moduleLogs: {
-      commandModule: (name: string, pattern: string) =>
-        `📌 Командный модуль: ${name} | Паттерны: ${pattern}`,
+      commandModule: (name: string, pattern: string) => `📌 Командный модуль: ${name} | Паттерны: ${pattern}`,
 
-      globalHandler: (name: string) =>
-        `🌐 Глобальный обработчик: ${name} (файл: ${name.toLowerCase()}.event.ts)`,
+      globalHandler: (name: string) => `🌐 Глобальный обработчик: ${name} (файл: ${name.toLowerCase()}.event.ts)`,
 
-      eventLoaded: (name: string, file: string) =>
-        `✅ Загружен EVENT-обработчик: ${name} (${file})`,
+      eventLoaded: (name: string, file: string) => `✅ Загружен EVENT-обработчик: ${name} (${file})`,
 
-      commandLoaded: (name: string, file: string) =>
-        `✅ Загружен командный модуль: ${name} (${file})`,
+      commandLoaded: (name: string, file: string) => `✅ Загружен командный модуль: ${name} (${file})`,
     },
     stylizeText: (text: string) => {
       const stylizedChars: Record<string, string> = {

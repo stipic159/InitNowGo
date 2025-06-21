@@ -1,7 +1,6 @@
 import fs from "fs/promises";
-import { Bot, Context } from "grammy";
 import path from "path";
-import { config, isGroup, Logger, reply, sck1, updateUserData } from "../lib";
+import { Bot, config, Context, ExecuteParams, isGroup, Logger, reply, sck1, updateUserData } from "../lib";
 import { eco, EconomyOperations } from "./Eco";
 
 const lastCommandUsageTimes = new Map();
@@ -59,6 +58,7 @@ export interface ModuleParams {
   isPrivateOnly?: boolean;
   isTagRequired?: boolean;
   nsfw?: boolean;
+  moduleType?: string;
   cooldownTime?: number;
 }
 
@@ -85,6 +85,7 @@ export default class BotUpdate {
   cooldownTime?: number;
   reply: any;
   eco: EconomyOperations;
+  moduleType?: "action" | "event" | "command" | "none";
   on?: boolean;
 
   constructor(params: ModuleParams) {
@@ -109,14 +110,11 @@ export default class BotUpdate {
     this.cooldownTime = params.cooldownTime || 0; // ✔️
     this.reply = reply; // ✔️
     this.eco = eco; // ✔️
+    this.moduleType = "none";
     this.on = params.on; // ✔️
   }
 
-  private static async validateModuleAccess(
-    bot: Bot<Context>,
-    ctx: Context,
-    moduleParams: ModuleParams
-  ): Promise<boolean> {
+  private static async validateModuleAccess(bot: Bot<Context>, ctx: Context, moduleParams: ModuleParams): Promise<boolean> {
     if (!ctx.from || !ctx.chat) return false;
 
     const userId = ctx.from.id;
@@ -125,9 +123,7 @@ export default class BotUpdate {
 
     const replyError = async (text: string, showAlert = false) => {
       if (isCallback) {
-        await ctx
-          .answerCallbackQuery({ text, show_alert: showAlert })
-          .catch(() => {});
+        await ctx.answerCallbackQuery({ text, show_alert: showAlert }).catch(() => {});
       } else if (ctx.msg) {
         await ctx.reply(text, {
           reply_parameters: { message_id: ctx.msg.message_id },
@@ -175,9 +171,7 @@ export default class BotUpdate {
         const errorMsg = `❗ Ошибка\n\n> Данная команда доступна раз в ${moduleParams.cooldownTime} мс, повторите попытку через - ${remainingTime}`;
 
         if (isCallback) {
-          await ctx
-            .answerCallbackQuery({ text: errorMsg, show_alert: true })
-            .catch(() => {});
+          await ctx.answerCallbackQuery({ text: errorMsg, show_alert: true }).catch(() => {});
         } else if (ctx.msg) {
           const { message_id } = await ctx.reply(
             `<b>❗ Ошибка</b>\n\n> Данная команда доступна раз в ${moduleParams.cooldownTime} мс, повторите попытку через - <b>${remainingTime}</b>`,
@@ -194,10 +188,7 @@ export default class BotUpdate {
       lastCommandUsageTimes.set(ctx.chat.id, currentTime);
     }
 
-    const checkGroupCondition = async (
-      condition: boolean,
-      errorText: string
-    ): Promise<boolean> => {
+    const checkGroupCondition = async (condition: boolean, errorText: string): Promise<boolean> => {
       if (!condition) {
         await replyError(errorText);
         return false;
@@ -206,10 +197,8 @@ export default class BotUpdate {
     };
 
     if (
-      (moduleParams.isGroupOnly &&
-        !(await checkGroupCondition(isGroup(ctx), "✖️ Ты не в группе!"))) ||
-      (moduleParams.isPrivateOnly &&
-        !(await checkGroupCondition(!isGroup(ctx), "✖️ Ты в группе!")))
+      (moduleParams.isGroupOnly && !(await checkGroupCondition(isGroup(ctx), "✖️ Ты не в группе!"))) ||
+      (moduleParams.isPrivateOnly && !(await checkGroupCondition(!isGroup(ctx), "✖️ Ты в группе!")))
     ) {
       return false;
     }
@@ -225,21 +214,13 @@ export default class BotUpdate {
     };
 
     if (
-      (moduleParams.isAdminGroup &&
-        !(await checkRole(
-          ["administrator", "creator"],
-          "✖️ Ты не админ в группе!"
-        ))) ||
-      (moduleParams.isCreatorGroup &&
-        !(await checkRole(["creator"], "✖️ Ты не создатель группы!")))
+      (moduleParams.isAdminGroup && !(await checkRole(["administrator", "creator"], "✖️ Ты не админ в группе!"))) ||
+      (moduleParams.isCreatorGroup && !(await checkRole(["creator"], "✖️ Ты не создатель группы!")))
     ) {
       return false;
     }
 
-    const checkResource = async (
-      hasEnough: boolean,
-      errorText: string
-    ): Promise<boolean> => {
+    const checkResource = async (hasEnough: boolean, errorText: string): Promise<boolean> => {
       if (!hasEnough) {
         await replyError(errorText);
         return false;
@@ -273,20 +254,20 @@ export default class BotUpdate {
     return true;
   }
 
-  static async register(bot: any) {
-    const patternModules = Array.from(this.loadedModules.values()).filter(
-      (m) => !m.on
-    );
+  static getByType(type: "command" | "action" | "event"): LoadedModule[] {
+    return Array.from(this.loadedModules.values()).filter((m) => m.moduleType === type);
+  }
 
-    const eventModules = Array.from(this.loadedModules.values()).filter(
-      (m) => m.on === true
-    );
+  static async register(bot: Bot) {
+    const patternModules = Array.from(this.loadedModules.values()).filter((m) => !m.on);
+
+    const eventModules = Array.from(this.loadedModules.values()).filter((m) => m.on === true);
 
     for (const moduleInfo of patternModules) {
       try {
         const { class: ModuleClass, pattern } = moduleInfo;
         const instance = new ModuleClass();
-        bot.use(instance.execute.bind(instance));
+        bot.use(instance.execute.bind(instance) as any);
       } catch (error: any) {
         Logger.error(reply.ru.BotUpdates.moduleRegistrationError, error);
       }
@@ -295,7 +276,7 @@ export default class BotUpdate {
     for (const moduleInfo of eventModules) {
       try {
         const instance = new moduleInfo.class();
-        bot.use(instance.execute.bind(instance));
+        bot.use(instance.execute.bind(instance) as any);
       } catch (error) {
         Logger.error(reply.ru.BotUpdates.eventHandlerError, error);
       }
@@ -318,9 +299,7 @@ export default class BotUpdate {
           try {
             const Module = await import(filePath);
             const ModuleClass = Object.values(Module).find(
-              (exported) =>
-                typeof exported === "function" &&
-                /^class\s/.test(exported.toString())
+              (exported) => typeof exported === "function" && /^class\s/.test(exported.toString())
             ) as { new (...args: any[]): BotUpdate } | undefined;
 
             if (ModuleClass) {
@@ -333,13 +312,14 @@ export default class BotUpdate {
               if (file.endsWith(`.event${tsNode}`)) {
                 moduleData.on = true;
                 moduleData.pattern = undefined;
-                Logger.success(
-                  reply.ru.moduleLogs.eventLoaded(ModuleClass.name, file)
-                );
-              } else {
-                Logger.success(
-                  reply.ru.moduleLogs.commandLoaded(ModuleClass.name, file)
-                );
+                moduleData.moduleType = "event";
+                Logger.success(`[EVENT] Загружено: ${ModuleClass.name} из ${file}`);
+              } else if (file.endsWith(`.action${tsNode}`)) {
+                moduleData.moduleType = "action";
+                Logger.success(`[ACTION] Загружено: ${ModuleClass.name} из ${file}`);
+              } else if (file.endsWith(`.command${tsNode}`)) {
+                moduleData.moduleType = "command";
+                Logger.success(`[COMMAND] Загружено: ${ModuleClass.name} из ${file}`);
               }
 
               this.loadedModules.set(file, moduleData);
@@ -358,15 +338,12 @@ export default class BotUpdate {
 
   static find(body: string) {
     const [command] = body.trim().toLowerCase().split(/\s+/);
-    const cleanCommand = command.startsWith("/")
-      ? command.slice(1).split("@")[0]
-      : command;
+    const cleanCommand = command.startsWith("/") ? command.slice(1).split("@")[0] : command;
 
     const commandModule = this.getAll().find((cmd) => {
       if (cmd.pattern) {
         if (Array.isArray(cmd.pattern)) {
-          if (cmd.pattern.some((p) => p.toLowerCase() === cleanCommand))
-            return true;
+          if (cmd.pattern.some((p) => p.toLowerCase() === cleanCommand)) return true;
         } else if (cmd.pattern instanceof RegExp) {
           if (cmd.pattern.test(cleanCommand)) return true;
         } else if (cmd.pattern.toLowerCase() === cleanCommand) {
@@ -391,7 +368,7 @@ export default class BotUpdate {
     return Array.from(BotUpdate.loadedModules.values());
   }
 
-  static async run(bot: any, ctx: Context) {
+  static async run(bot: Bot, ctx: Context) {
     let text: string = "";
     let args: string[] = [];
     let command: string = "";
@@ -404,19 +381,14 @@ export default class BotUpdate {
           await this.handleCallbackQuery(bot, ctx);
         } else {
           Logger.warn(reply.ru.BotUpdates.invalidCallbackWarning);
-          await ctx
-            .answerCallbackQuery(reply.ru.BotUpdates.callbackQueryError)
-            .catch(() => {});
+          await ctx.answerCallbackQuery(reply.ru.BotUpdates.callbackQueryError).catch(() => {});
         }
         return;
       }
 
       if (ctx.message && "text" in ctx.message && ctx.message.text) {
         const fullText = ctx.message.text.trim();
-        const commandRegex = new RegExp(
-          `^/?([a-zA-Z0-9_]+)(?:@${botUsername})?\\s*([\\s\\S]*)$`,
-          "i"
-        );
+        const commandRegex = new RegExp(`^/?([a-zA-Z0-9_]+)(?:@${botUsername})?\\s*([\\s\\S]*)$`, "i");
         const match = fullText.match(commandRegex);
 
         if (match) {
@@ -429,15 +401,9 @@ export default class BotUpdate {
 
       const { commandModule } = BotUpdate.find(command);
       if (commandModule) {
-        const hasAccess = await this.validateModuleAccess(
-          bot,
-          ctx,
-          commandModule
-        );
+        const hasAccess = await this.validateModuleAccess(bot, ctx, commandModule);
         if (!hasAccess) return;
-        const groupInfo = isGroup(ctx)
-          ? `GId: ${ctx.chat?.id}, GN: ${ctx.chat?.title}`
-          : "";
+        const groupInfo = isGroup(ctx) ? `GId: ${ctx.chat?.id}, GN: ${ctx.chat?.title}` : "";
 
         Logger.command("======================");
         Logger.command(`ID: ${ctx.from?.id}, UN: ${ctx.from?.username}`);
@@ -475,16 +441,12 @@ export default class BotUpdate {
           }
           try {
             const userInfo = `ID: ${ctx.from?.id}, UN: ${ctx.from?.username}`;
-            const groupInfo = isGroup(ctx)
-              ? `GId: ${ctx.chat?.id}, GN: ${ctx.chat?.title}`
-              : "";
+            const groupInfo = isGroup(ctx) ? `GId: ${ctx.chat?.id}, GN: ${ctx.chat?.title}` : "";
 
             Logger.message("======================");
             Logger.message(userInfo);
             if (groupInfo) Logger.message(groupInfo);
-            Logger.message(
-              `Content Type: ${contentType}, Text: ${textContent}`
-            );
+            Logger.message(`Content Type: ${contentType}, Text: ${textContent}`);
             Logger.message("======================");
           } catch (loggingError) {
             Logger.error("Logging failed:", loggingError);
@@ -500,10 +462,7 @@ export default class BotUpdate {
                 ...DATABASES,
               });
             } catch (moduleError) {
-              Logger.error(
-                `Error in module ${moduleInfo.class.name}:`,
-                moduleError
-              );
+              Logger.error(`Error in module ${moduleInfo.class.name}:`, moduleError);
             }
           }
         } catch (filterError) {
@@ -515,7 +474,7 @@ export default class BotUpdate {
     }
   }
 
-  static async handleCallbackQuery(bot: any, ctx: Context) {
+  static async handleCallbackQuery(bot: Bot, ctx: Context) {
     try {
       const callbackQuery = ctx.update.callback_query;
       if (!callbackQuery?.data) return;
@@ -525,11 +484,7 @@ export default class BotUpdate {
 
       const { commandModule } = this.find(command);
       if (commandModule) {
-        const hasAccess = await this.validateModuleAccess(
-          bot,
-          ctx,
-          commandModule
-        );
+        const hasAccess = await this.validateModuleAccess(bot, ctx, commandModule);
         if (!hasAccess) return;
 
         const instance = new commandModule.class();
@@ -543,13 +498,11 @@ export default class BotUpdate {
       }
     } catch (error) {
       Logger.error(reply.ru.BotUpdates.callbackProcessingError, error);
-      await ctx
-        .answerCallbackQuery(reply.ru.BotUpdates.callbackExecutionError)
-        .catch(() => {});
+      await ctx.answerCallbackQuery(reply.ru.BotUpdates.callbackExecutionError).catch(() => {});
     }
   }
 
-  async execute(bot: any, ctx: Context, params: any) {
+  async execute(bot: Bot, ctx: Context, params: ExecuteParams) {
     throw new Error(reply.ru.BotUpdates.executeNotImplemented);
   }
 }

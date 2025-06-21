@@ -1,7 +1,4 @@
-import { Context } from "grammy";
-import { start } from "../../../lib";
-import BotUpdate from "../../BotUpdates";
-
+import { Bot, BotUpdate, Context, ExecuteParams, start } from "../../../lib";
 export class StartAction extends BotUpdate {
   constructor() {
     super({
@@ -11,11 +8,7 @@ export class StartAction extends BotUpdate {
     });
   }
 
-  async execute(
-    bot: any,
-    ctx: Context,
-    { text, args, Logger }: any
-  ): Promise<void> {
+  async execute(bot: Bot, ctx: Context, { text, args, Logger }: ExecuteParams): Promise<void> {
     await ctx.deleteMessage();
     await start(bot, ctx, true, { text, args, Logger });
   }

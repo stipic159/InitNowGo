@@ -34,7 +34,7 @@ bot.use(async (ctx, next) => {
   await next();
 });
 
-bot.use((ctx) => BotUpdate.run(bot, ctx));
+bot.use((ctx) => BotUpdate.run(bot as any, ctx));
 
 bot.catch((err) => Logger.error("Middleware error:", err));
 
@@ -48,7 +48,7 @@ async function bootstrap() {
     const modulesPath = path.join(__dirname, "updates");
     await BotUpdate.loadModules(modulesPath);
     Logger.info("Модули успешно загружены.");
-    await BotUpdate.register(bot);
+    await BotUpdate.register(bot as any);
 
     await bot.start({
       drop_pending_updates: true,
