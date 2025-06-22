@@ -1,16 +1,16 @@
 import { Bot, BotUpdate, Context, ExecuteParams, help } from "../../../lib";
 
-export class HelpCommand extends BotUpdate {
+export class HelpAction extends BotUpdate {
   constructor() {
     super({
-      pattern: "help",
-      aliases: ["h", "menu"],
-      desc: "Помощь по командам",
+      pattern: "help_data",
+      desc: "Дата help",
       category: ["🏠 Базовые команды"],
     });
   }
 
   async execute(bot: Bot, ctx: Context, { text, args, Logger }: ExecuteParams): Promise<void> {
-    await help(bot, ctx, false, { text, args, Logger });
+    await ctx.deleteMessage();
+    await help(bot, ctx, true, { text, args, Logger });
   }
 }

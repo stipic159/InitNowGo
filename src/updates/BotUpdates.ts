@@ -5,7 +5,7 @@ import { eco, EconomyOperations } from "./Eco";
 
 const lastCommandUsageTimes = new Map();
 
-const MESSAGE_TYPES: string[] = [
+export const MESSAGE_TYPES: string[] = [
   "text",
   "photo",
   "video",
@@ -345,15 +345,16 @@ export default class BotUpdate {
 
             if (ModuleClass) {
               const instance = new ModuleClass();
-              const moduleData = {
+              const moduleData: LoadedModule = {
                 class: ModuleClass,
                 ...instance,
+                moduleType: "none",
               };
 
               if (file.endsWith(`.event${tsNode}`)) {
+                moduleData.moduleType = "event";
                 moduleData.on = true;
                 moduleData.pattern = undefined;
-                moduleData.moduleType = "event";
                 Logger.success(`[EVENT] Загружено: ${ModuleClass.name} из ${file}`);
               } else if (file.endsWith(`.action${tsNode}`)) {
                 moduleData.moduleType = "action";
@@ -361,6 +362,8 @@ export default class BotUpdate {
               } else if (file.endsWith(`.command${tsNode}`)) {
                 moduleData.moduleType = "command";
                 Logger.success(`[COMMAND] Загружено: ${ModuleClass.name} из ${file}`);
+              } else {
+                Logger.warn(`Неизвестный тип модуля для файла: ${file}`);
               }
 
               this.loadedModules.set(file, moduleData);
@@ -445,7 +448,7 @@ export default class BotUpdate {
       }
 
       const { commandModule } = BotUpdate.find(command);
-      if (commandModule) {
+      if (commandModule && commandModule.moduleType === "command") {
         const hasAccess = await this.validateModuleAccess(bot, ctx, commandModule);
         if (!hasAccess) return;
         const groupInfo = isGroup(ctx) ? `GId: ${ctx.chat?.id}, GN: ${ctx.chat?.title}` : "";
@@ -485,6 +488,7 @@ export default class BotUpdate {
             }
           }
           try {
+            await updateUserData(ctx);
             const userInfo = `ID: ${ctx.from?.id}, UN: ${ctx.from?.username}`;
             const groupInfo = isGroup(ctx) ? `GId: ${ctx.chat?.id}, GN: ${ctx.chat?.title}` : "";
 
@@ -528,7 +532,7 @@ export default class BotUpdate {
       const [command] = data.split(":");
 
       const { commandModule } = this.find(command);
-      if (commandModule) {
+      if (commandModule && commandModule.moduleType === "action") {
         const hasAccess = await this.validateModuleAccess(bot, ctx, commandModule);
         if (!hasAccess) return;
 

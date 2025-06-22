@@ -1,6 +1,15 @@
 import { Bot, Context } from "grammy";
-import { ModuleParams } from "../updates/BotUpdates";
+import BotUpdate, { MESSAGE_TYPES, ModuleParams } from "../updates/BotUpdates";
 import { sck1 } from "./database";
+
+function getMessageType(message: any): string | null {
+  for (const type of MESSAGE_TYPES) {
+    if (message[type] !== undefined) {
+      return type;
+    }
+  }
+  return null;
+}
 
 export function isGroup(ctx?: Context): boolean {
   return ctx?.chat?.type === "supergroup" || ctx?.chat?.type === "group";
@@ -17,7 +26,7 @@ export async function updateUserData(ctx: Context, commandPlugin?: ModuleParams)
     if (commandPlugin) {
       await updateCommandUsage(userId, commandPlugin);
     } else {
-      await updateMessageStats(userId, user);
+      await updateMessageStats(userId, user, ctx);
     }
   }
 }
@@ -52,14 +61,16 @@ async function updateCommandUsage(userId: number, commandPlugin: ModuleParams): 
   );
 }
 
-async function updateMessageStats(userId: number, user: any): Promise<void> {
+async function updateMessageStats(userId: number, user: any, ctx: Context): Promise<void> {
+  if (!ctx.message) return;
+
   await sck1.updateOne(
     { id: userId },
     {
       $set: {
         msg: user.msg + 1,
         lastSendMsg: new Date(),
-        allTimeMessages: user.msg + 1,
+        allTimeMessages: user.allTimeMessages + 1,
       },
     }
   );
@@ -128,6 +139,25 @@ async function sendWelcomeBackMessage(ctx: Context, user: any, replyParameters: 
   } catch (error) {
     Logger.warn(`Welcome back error: ${error}`);
   }
+}
+
+export async function help(bot: Bot, ctx: Context, isAction: boolean, { text, args, Logger }: ExecuteParams): Promise<void> {
+  if (!ctx.msg) return;
+  const name = ctx.from?.first_name || ctx.from?.username || "Пользователь";
+  const categories = Array.from(BotUpdate.categoryIdMap.keys());
+  const replyParameters = isAction || !ctx.msg ? undefined : { message_id: ctx.msg.message_id };
+
+  const buttons = categories.map((category) => [
+    {
+      text: category,
+      callback_data: `help_category:${BotUpdate.categoryIdMap.get(category)}:${ctx.msg?.message_id}:${ctx.from?.id}`,
+    },
+  ]);
+
+  await ctx.reply(`Привет, ${name}! Выбери категорию, чтобы посмотреть все команды:`, {
+    reply_markup: { inline_keyboard: buttons },
+    reply_parameters: replyParameters,
+  });
 }
 
 export interface ExecuteParams {

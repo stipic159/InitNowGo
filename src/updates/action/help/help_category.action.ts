@@ -60,7 +60,7 @@ export class HelpCategoryAction extends BotUpdate {
         [
           {
             text: "⬅️ Назад", // todo
-            callback_data: `help:${ctx.from?.id}`,
+            callback_data: `help_data:${ctx.from?.id}`,
           },
         ],
       ],
