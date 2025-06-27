@@ -59,7 +59,7 @@ export class HelpCategoryAction extends BotUpdate {
       inline_keyboard: [
         [
           {
-            text: "⬅️ Назад", // todo
+            text: "⬅️ Назад",
             callback_data: `help_data:${ctx.from?.id}`,
           },
         ],

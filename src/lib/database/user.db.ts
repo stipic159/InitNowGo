@@ -26,6 +26,7 @@ const UserSchema = new mongoose.Schema({
     sumMsg: { type: Number, default: 0 },
     cell: { type: Number, default: 1 },
   },
+  passing: {},
   dataBan: {
     ban: { type: Boolean, default: false },
     typeBan: { type: String, default: "-" },

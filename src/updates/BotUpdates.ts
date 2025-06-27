@@ -51,6 +51,7 @@ export interface ModuleParams {
   desc: string;
   category: string[];
   isCreator?: boolean;
+  isBotAdminGroup?: boolean;
   isAdminGroup?: boolean;
   isCreatorGroup?: boolean;
   level?: number;
@@ -75,6 +76,7 @@ export default class BotUpdate {
   desc: string;
   category: string[];
   isCreator: boolean;
+  isBotAdminGroup?: boolean;
   isAdminGroup?: boolean;
   isCreatorGroup?: boolean;
   level?: number;
@@ -100,6 +102,7 @@ export default class BotUpdate {
     this.desc = params.desc; // ✔️
     this.category = params.category; // ✔️
     this.isCreator = params.isCreator || false; // ✔️
+    this.isBotAdminGroup = params.isBotAdminGroup || false;
     this.isAdminGroup = params.isAdminGroup || false; // ✔️
     this.isCreatorGroup = params.isCreatorGroup || false; // ✔️
     this.level = params.level || 1; // ✔️
@@ -107,8 +110,8 @@ export default class BotUpdate {
     this.priceLvl = params.priceLvl || 0; // ✔️
     this.isGroupOnly = params.isGroupOnly || false; // ✔️
     this.isPrivateOnly = params.isPrivateOnly || false; // ✔️
-    this.isTagRequired = params.isTagRequired || false; // todo
-    this.nsfw = params.nsfw || false; // todo
+    this.isTagRequired = params.isTagRequired || false; // TODO: сделать
+    this.nsfw = params.nsfw || false; // TODO: Сделать
     this.cooldownTime = params.cooldownTime || 0; // ✔️
     this.reply = reply; // ✔️
     this.eco = eco; // ✔️
@@ -198,7 +201,12 @@ export default class BotUpdate {
       return isAllowed;
     }
     if (isCallback && !ctx.update.callback_query?.data?.endsWith(String(ctx.from.id))) {
-      await ctx.answerCallbackQuery({ text: "Эта кнопка не для вас!", show_alert: true }).catch(() => {});
+      await ctx
+        .answerCallbackQuery({
+          text: "Эта кнопка не для вас!",
+          show_alert: true,
+        })
+        .catch(() => {});
     }
     if (moduleParams.isCreator) {
       const developerId = Number(config.get("BOT").ID_DEVELOPER);
@@ -269,17 +277,18 @@ export default class BotUpdate {
       return false;
     }
 
-    const checkRole = async (requiredStatus: string[], errorText: string) => {
+    const checkRole = async (requiredStatus: string[], errorText: string, isBotAdminGroup?: boolean) => {
       if (!ctx.chat) return false;
-      const status = (await ctx.getChatMember(userId)).status;
-      if (!requiredStatus.includes(status)) {
-        await replyError(errorText);
-        return false;
-      }
-      return true;
+      const targetUserId = isBotAdminGroup ? bot.botInfo.id : userId;
+      const { status } = await ctx.getChatMember(targetUserId);
+      if (requiredStatus.includes(status)) return true;
+
+      await replyError(errorText);
+      return false;
     };
 
     if (
+      (moduleParams.isBotAdminGroup && !(await checkRole(["administrator"], "✖️ Бот не админ в группе!", true))) ||
       (moduleParams.isAdminGroup && !(await checkRole(["administrator", "creator"], "✖️ Ты не админ в группе!"))) ||
       (moduleParams.isCreatorGroup && !(await checkRole(["creator"], "✖️ Ты не создатель группы!")))
     ) {

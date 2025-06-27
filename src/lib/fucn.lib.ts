@@ -147,6 +147,60 @@ export async function help(bot: Bot, ctx: Context, isAction: boolean, { text, ar
   const categories = Array.from(BotUpdate.categoryIdMap.keys());
   const replyParameters = isAction || !ctx.msg ? undefined : { message_id: ctx.msg.message_id };
 
+  if (text) {
+    const commandName = text.trim().toLowerCase();
+    const commandModule = BotUpdate.getAll().find(
+      (module) =>
+        module.moduleType === "command" &&
+        ((typeof module.pattern === "string" && module.pattern.toLowerCase() === commandName) ||
+          (Array.isArray(module.pattern) && module.pattern.some((p) => p.toLowerCase() === commandName)) ||
+          (module.aliases && module.aliases.some((a) => a.toLowerCase() === commandName)))
+    );
+
+    if (commandModule) {
+      let detailText = `<b>ℹ️ Информация о команде</b>\n\n`;
+
+      detailText += `<b>🔖 Название:</b> <code>${commandModule.pattern}</code>\n`;
+
+      if (commandModule.aliases && commandModule.aliases.length > 0) {
+        detailText += `<b>📎 Алиасы:</b> ${commandModule.aliases.map((a) => `<code>${a}</code>`).join(", ")}\n`;
+      }
+
+      detailText += `\n<b>📝 Описание:</b>\n${commandModule.desc}\n`;
+      detailText += `\n<b>🗂️ Категории:</b>\n${commandModule.category.join(", ")}\n`;
+
+      detailText += "────────────\n";
+
+      detailText += `<b>🔐 Права доступа:</b>\n`;
+      detailText += `• Создатель бота: ${commandModule.isCreator ? "✅" : "❌"}\n`;
+      detailText += `• Админы группы: ${commandModule.isAdminGroup ? "✅" : "❌"}\n`;
+      detailText += `• Владелец группы: ${commandModule.isCreatorGroup ? "✅" : "❌"}\n`;
+      detailText += `• Требуемый уровень: ${commandModule.level}\n`;
+
+      if (commandModule.priceMsg || commandModule.priceLvl) {
+        detailText += `\n<b>💸 Стоимость:</b>\n`;
+        if (commandModule.priceMsg) detailText += `• Сообщения: ${commandModule.priceMsg}\n`;
+        if (commandModule.priceLvl) detailText += `• Уровни: ${commandModule.priceLvl}\n`;
+      }
+
+      detailText += `\n<b>⚖️ Ограничения:</b>\n`;
+      detailText += `• Только группы: ${commandModule.isGroupOnly ? "✅" : "❌"}\n`;
+      detailText += `• Только ЛС: ${commandModule.isPrivateOnly ? "✅" : "❌"}\n`;
+      detailText += `• Требует тега: ${commandModule.isTagRequired ? "✅" : "❌"}\n`;
+      detailText += `• NSFW: ${commandModule.nsfw ? "🔞" : "❌"}\n`;
+
+      if (commandModule.cooldownTime) {
+        detailText += `\n<b>⏱️ Кулдаун:</b> ${commandModule.cooldownTime / 1000} сек.\n`;
+      }
+
+      await ctx.reply(detailText, {
+        parse_mode: "HTML",
+        reply_parameters: replyParameters,
+      });
+      return;
+    }
+  }
+
   const buttons = categories.map((category) => [
     {
       text: category,
@@ -154,7 +208,12 @@ export async function help(bot: Bot, ctx: Context, isAction: boolean, { text, ar
     },
   ]);
 
-  await ctx.reply(`Привет, ${name}! Выбери категорию, чтобы посмотреть все команды:`, {
+  let message = `Привет, ${name}! Выбери категорию, чтобы посмотреть команды:`;
+  if (text) {
+    message = `🚫 Команда "${text}" не найдена!\n\n` + message;
+  }
+
+  await ctx.reply(message, {
     reply_markup: { inline_keyboard: buttons },
     reply_parameters: replyParameters,
   });

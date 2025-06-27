@@ -23,11 +23,11 @@ export class OrientationEvent extends BotUpdate {
 
     const orientationText = ctx?.message?.text?.trim();
     const isValidText =
-      orientationText && orientationText.length <= 17 && /^[\p{L}\p{M}\w\s\p{Emoji}\d]+$/u.test(orientationText);
+      orientationText && orientationText.length <= 27 && /^[\p{L}\p{M}\w\s\p{Emoji}\d]+$/u.test(orientationText);
 
     if (!isValidText) {
       const errorMsg = await ctx.reply(
-        `<b>🛡️ Помощь</b>\n\nНе больше 17 символов, без ссылок, некоторые символы заблокированы.`,
+        `<b>🛡️ Помощь</b>\n\nНе больше 27 символов, без ссылок, некоторые символы заблокированы.`,
         { parse_mode: "HTML" }
       );
       session.errorMessageIdsOrientation.push(errorMsg.message_id, ctx.message.message_id);
