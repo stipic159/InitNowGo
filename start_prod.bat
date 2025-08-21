@@ -1,6 +1,6 @@
 @echo off
 echo Компиляция TypeScript...
-call npm run build
+call yarn run build
 
 if %errorlevel% neq 0 (
     echo Ошибка компиляции, проверьте ошибки выше
@@ -9,4 +9,4 @@ if %errorlevel% neq 0 (
 )
 
 echo Запуск бота...
-node dist\main.js
+node dist/core/app.js

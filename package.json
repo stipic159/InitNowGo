@@ -2,28 +2,41 @@
   "name": "initnowgo",
   "version": "1.0.1",
   "description": "telegram-bot",
-  "main": "src/main.ts",
+  "main": "src/core/app.ts",
   "scripts": {
-    "test": "ts-node src/main.ts",
-    "build": "tsc",
+    "build": "tsgo",
     "start": "chmod +x start_prod.sh && ./start_prod.sh",
-    "start:win": "start_prod.bat"
+    "start:win": "start_prod.bat",
+    "lint": "eslint . --ext .js",
+    "lint:fix": "eslint src --fix",
+    "format": "prettier --write ."
   },
+  "type": "module",
   "keywords": [],
   "author": "",
   "license": "MIT",
-  "devDependencies": {
-    "@types/node": "24.0.3",
-    "nodemon": "3.1.10",
-    "ts-node": "10.9.2",
-    "typescript": "5.8.3"
-  },
   "dependencies": {
     "@grammyjs/types": "3.20.0",
     "chalk": "5.4.1",
     "dotenv": "16.5.0",
     "grammy": "1.36.3",
     "mongoose": "8.16.0",
+    "pino": "^9.9.0",
+    "pm2": "^6.0.8",
     "typegram": "5.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.0.3",
+    "@typescript-eslint/eslint-plugin": "^8.40.0",
+    "@typescript-eslint/parser": "^8.40.0",
+    "@typescript/native-preview": "^7.0.0-dev.20250821.1",
+    "eslint": "^9.32.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "nodemon": "3.1.10",
+    "pino-pretty": "^13.1.1",
+    "prettier": "^3.6.2",
+    "ts-node": "10.9.2",
+    "typescript": "5.8.3"
   }
 }

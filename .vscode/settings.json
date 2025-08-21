@@ -1,1 +1,101 @@
-{ "todohighlight.isEnable": true }
+{
+  "editor.fontSize": 14,
+  "editor.tabSize": 2,
+  "editor.detectIndentation": false,
+  "editor.insertSpaces": true,
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit",
+    "source.organizeImports": "explicit"
+  },
+
+  "files.autoSave": "onFocusChange",
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/sessions": true,
+    "**/.yarn": true,
+    "*/.pnp.": true,
+    "*/baileys_store_.json": true,
+    "/auth_info_baileys/": true,
+    "**/.DS_Store": true,
+    "**/coverage": true
+  },
+
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/sessions": true,
+    "**/.yarn": true,
+    "**/auth_info_baileys": true,
+    "*/baileys_store_.json": true
+  },
+
+  "eslint.validate": ["javascript", "javascriptreact", "typescript", "typescriptreact"],
+  "eslint.format.enable": true,
+
+  "typescript.suggest.autoImports": true,
+  "typescript.updateImportsOnFileMove.enabled": "always",
+  "javascript.suggest.autoImports": true,
+
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.tabSize": 2
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.tabSize": 2
+  },
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+
+  "prettier.singleQuote": true,
+  "prettier.semi": false,
+  "prettier.trailingComma": "es5",
+  "prettier.printWidth": 120,
+
+  "problems.autoReveal": true,
+
+  "editor.bracketPairColorization.enabled": true,
+  "editor.guides.bracketPairs": true,
+  "editor.renderWhitespace": "boundary",
+  "editor.showFoldingControls": "mouseover",
+
+  "terminal.integrated.defaultProfile.windows": "Git Bash",
+  "terminal.integrated.fontSize": 13,
+
+  "debug.console.fontSize": 13,
+  "debug.inlineValues": "on",
+
+  "workbench.colorTheme": "Night Owl",
+  "workbench.iconTheme": "material-icon-theme",
+  "workbench.startupEditor": "none",
+
+  "files.associations": {
+    ".env": "properties"
+  },
+
+  "git.autofetch": true,
+  "git.confirmSync": false,
+  "git.enableSmartCommit": true,
+
+  "explorer.confirmDelete": false,
+  "explorer.confirmDragAndDrop": false,
+
+  "breadcrumbs.enabled": true,
+  "editor.minimap.enabled": false,
+
+  "npm.packageManager": "yarn",
+
+  "typescript.preferences.importModuleSpecifier": "relative",
+  "cSpell.language": "en,ru",
+  "cSpell.words": ["cooldown", "Creds", "Secktor", "voroby"],
+  "editor.quickSuggestions": {
+    "other": true,
+    "comments": false,
+    "strings": true
+  },
+  "typescript.preferences.includePackageJsonAutoImports": "on",
+  "typescript.experimental.useTsgo": true,
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.preferences.useAliasesForRenames": false
+}
